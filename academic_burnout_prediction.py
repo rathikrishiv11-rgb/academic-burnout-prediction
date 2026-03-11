@@ -1,156 +1,218 @@
 import pandas as pd
-
-df = pd.read_csv("student-mat.csv", sep=';')
-
-# print(df.head())
-# print(df.shape) 
-# print(df[["G1", "G2", "G3"]].head())
-
-df["at_risk"] = ((df.G3<10) | ((df.G3<df.G2) & (df.G2<df.G1))).astype(int) 
-# print(df["at_risk"].value_counts)
-
-df.drop(columns=["G3"], inplace=True)
-# print(df.head())
-
 import seaborn as sns
 import matplotlib.pyplot as plt
-sns.boxplot(x="at_risk", y="absences", data=df)
-plt.title("Absences vs Academic Burnout Risk")
-plt.show()
-#Students flagged as at-risk tend to have higher absences, indicating disengagement.
 
-sns.countplot(x="studytime", hue="at_risk", data=df)
-plt.title("Study Time Distribution by Burnout Risk")
-plt.show()
-#Students classified as at-risk are more concentrated in lower and moderate study time categories, suggesting that reduced academic engagement is associated with a higher likelihood of burnout or performance decline.
+from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+from sklearn.metrics import (
+    accuracy_score,
+    confusion_matrix,
+    classification_report,
+    recall_score,
+    roc_auc_score,
+    RocCurveDisplay,
+    ConfusionMatrixDisplay
+)
 
-sns.countplot(x="failures", hue="at_risk", data=df)
-plt.title("Past Failures vs Academic Burnout Risk")
-plt.show()
-#Students with previous academic failures show a significantly higher likelihood of being classified as at-risk.
+# 1. LOAD DATA
 
-sns.countplot(x="famsup", hue="at_risk", data=df)
-plt.title("Family Support vs Academic Burnout Risk")
-plt.show()
-#Although a higher number of at-risk students report having family support, this is likely due to the overall dominance of this category in the dataset rather than a direct causal relationship. Proportional analysis would be required for deeper insight.
+df = pd.read_csv("student-mat.csv", sep=';')
+print("Dataset shape:", df.shape)
+print(df.head())
+
+# 2. TARGET VARIABLE DEFINITION
+
+df["at_risk"] = (
+    (df["G3"] < 10) |
+    ((df["G3"] < df["G2"]) & (df["G2"] < df["G1"]))
+).astype(int)
+
+print("\n--- Class Distribution ---")
+print(df["at_risk"].value_counts())
+print(df["at_risk"].value_counts(normalize=True).round(3))
+
+df.drop(columns=["G3"], inplace=True)
+
+# 3. EXPLORATORY DATA ANALYSIS (EDA)
+
+fig, axes = plt.subplots(2, 3, figsize=(16, 10))
+fig.suptitle("EDA: Behavioral Indicators vs At-Risk Label", fontsize=14)
+
+sns.boxplot(x="at_risk", y="absences", data=df, ax=axes[0, 0])
+axes[0, 0].set_title("Absences vs At-Risk")
+
+sns.countplot(x="studytime", hue="at_risk", data=df, ax=axes[0, 1])
+axes[0, 1].set_title("Study Time vs At-Risk")
+
+sns.countplot(x="failures", hue="at_risk", data=df, ax=axes[0, 2])
+axes[0, 2].set_title("Past Failures vs At-Risk")
+
+sns.countplot(x="famsup", hue="at_risk", data=df, ax=axes[1, 0])
+axes[1, 0].set_title("Family Support vs At-Risk")
 
 df["total_alcohol"] = df["Dalc"] + df["Walc"]
-sns.boxplot(x="at_risk", y="total_alcohol", data=df)
-plt.title("Alcohol Consumption vs Academic Burnout Risk")
-plt.show()
-#Alcohol consumption shows similar distributions across both at-risk and non–at-risk groups, indicating it may not be a strong standalone predictor of academic burnout in this dataset.
+sns.boxplot(x="at_risk", y="total_alcohol", data=df, ax=axes[1, 1])
+axes[1, 1].set_title("Total Alcohol vs At-Risk")
 
-# print(df["at_risk"].value_counts()) 
+sns.scatterplot(x="G1", y="G2", hue="at_risk", data=df, ax=axes[1, 2], alpha=0.6)
+axes[1, 2].set_title("G1 vs G2 by At-Risk")
+
+plt.tight_layout()
+plt.savefig("eda_plots.png", dpi=150)
+plt.show()
+print("EDA plots saved.")
+
+# 4. FEATURE ENGINEERING
 
 df["high_absence_flag"] = (df["absences"] > df["absences"].median()).astype(int)
 df["low_study_flag"] = (df["studytime"] <= 2).astype(int)
 
-# print(df[["total_alcohol", "high_absence_flag", "low_study_flag"]].head())
-#Feature Engineering:
-#total_alcohol captures combined lifestyle behavior
-#high_absence_flag identifies frequent absenteeism
-#low_study_flag represents reduced academic engagement
-df.drop(columns=["Dalc", "Walc"], inplace=True)
+df.drop(columns=["Dalc", "Walc", "G1", "G2"], inplace=True)
 
-from sklearn.model_selection import train_test_split
+print("\nFinal feature set shape after engineering:", df.drop(columns=["at_risk"]).shape)
+
+# 5. PREPROCESSING
+
 X = df.drop(columns=["at_risk"])
-Y = df["at_risk"]
+y = df["at_risk"]
 
-X.select_dtypes(include="object").columns
 X = pd.get_dummies(X, drop_first=True)
 
-X_train, X_test, Y_train, Y_test = train_test_split(X,Y, test_size=0.2, random_state=42, stratify=Y)
-# print(X_train.shape)
-# print(X_test.shape)
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
 
-# print(Y_train.value_counts(normalize=True)) 
-# print(Y_test.value_counts(normalize=True)) 
+print(f"\nTrain size: {X_train.shape}, Test size: {X_test.shape}")
+print("Train class balance:\n", y_train.value_counts(normalize=True).round(3))
+print("Test class balance:\n", y_test.value_counts(normalize=True).round(3))
 
-from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import Pipeline
-from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+# 6. MODEL TRAINING + EVALUATION
+
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+
+# Logistic Regression 
 log_reg = Pipeline([
     ("scaler", StandardScaler()),
-    ("model", LogisticRegression(max_iter=1000))
+    ("model", LogisticRegression(max_iter=1000, class_weight="balanced"))
 ])
 
-log_reg.fit(X_train, Y_train)
-Y_pred_lr = log_reg.predict(X_test)
+log_reg.fit(X_train, y_train)
+y_pred_lr = log_reg.predict(X_test)
+cv_lr = cross_val_score(log_reg, X, y, cv=cv, scoring="recall")
 
-print("Logistic Regression Accuracy : ", accuracy_score(Y_test, Y_pred_lr))
-print(confusion_matrix(Y_test, Y_pred_lr))
-print(classification_report(Y_test, Y_pred_lr))
-# Observation:
-# Logistic Regression demonstrates strong baseline performance with high accuracy and balanced precision–recall. While it is not the top-performing model, its interpretability and stability make it a reliable reference model for academic burnout prediction.
+print("\n========== Logistic Regression ==========")
+print(f"Test Accuracy : {accuracy_score(y_test, y_pred_lr):.4f}")
+print(f"Test ROC-AUC  : {roc_auc_score(y_test, log_reg.predict_proba(X_test)[:, 1]):.4f}")
+print(f"CV Recall (5-fold): {cv_lr.mean():.4f} ± {cv_lr.std():.4f}")
+print(classification_report(y_test, y_pred_lr))
+ConfusionMatrixDisplay.from_estimator(log_reg, X_test, y_test)
+plt.title("Logistic Regression - Confusion Matrix")
+plt.savefig("cm_logreg.png", dpi=150)
+plt.show()
 
-from sklearn.tree import DecisionTreeClassifier
+# Decision Tree 
 dt = DecisionTreeClassifier(
     random_state=42,
-    max_depth=5
+    max_depth=5,
+    class_weight="balanced" 
 )
-dt.fit(X_train, Y_train)
-Y_pred_dt = dt.predict(X_test)
 
-print("Decision Tree Accuracy:", accuracy_score(Y_test, Y_pred_dt))
-print(confusion_matrix(Y_test, Y_pred_dt))
-print(classification_report(Y_test, Y_pred_dt))
-# Observation:
-# Decision Tree improves recall for at-risk students compared to Logistic Regression but shows lower overall accuracy and precision. While it captures non-linear relationships, it introduces more false positives, reducing its reliability as a standalone model.
+dt.fit(X_train, y_train)
+y_pred_dt = dt.predict(X_test)
+cv_dt = cross_val_score(dt, X, y, cv=cv, scoring="recall")
 
-from sklearn.ensemble import RandomForestClassifier
+print("\n========== Decision Tree ==========")
+print(f"Test Accuracy : {accuracy_score(y_test, y_pred_dt):.4f}")
+print(f"Test ROC-AUC  : {roc_auc_score(y_test, dt.predict_proba(X_test)[:, 1]):.4f}")
+print(f"CV Recall (5-fold): {cv_dt.mean():.4f} ± {cv_dt.std():.4f}")
+print(classification_report(y_test, y_pred_dt))
+
+# Random Forest
 rf = RandomForestClassifier(
     n_estimators=100,
-    random_state=42
+    random_state=42,
+    class_weight="balanced" 
 )
-rf.fit(X_train, Y_train)
-Y_pred_rf = rf.predict(X_test)
 
-print("Random Forest Accuracy:", accuracy_score(Y_test, Y_pred_rf))
-print(confusion_matrix(Y_test, Y_pred_rf))
-print(classification_report(Y_test, Y_pred_rf))
+rf.fit(X_train, y_train)
+y_pred_rf = rf.predict(X_test)
+cv_rf = cross_val_score(rf, X, y, cv=cv, scoring="recall")
+
+print("\n Random Forest ")
+print(f"Test Accuracy : {accuracy_score(y_test, y_pred_rf):.4f}")
+print(f"Test ROC-AUC  : {roc_auc_score(y_test, rf.predict_proba(X_test)[:, 1]):.4f}")
+print(f"CV Recall (5-fold): {cv_rf.mean():.4f} ± {cv_rf.std():.4f}")
+print(classification_report(y_test, y_pred_rf))
+
+# Feature importances
 importances = pd.Series(
     rf.feature_importances_,
     index=X.columns
 ).sort_values(ascending=False)
+
 print("\nTop 10 Feature Importances (Random Forest):")
 print(importances.head(10))
 
-# Observation:
+plt.figure(figsize=(10, 5))
+importances.head(10).plot(kind="bar")
+plt.title("Top 10 Feature Importances - Random Forest")
+plt.tight_layout()
+plt.savefig("feature_importances.png", dpi=150)
+plt.show()
 
-# Absences, past failures, and study engagement-related features contribute most significantly to burnout risk prediction.
-# Random Forest achieves the highest accuracy and recall for at-risk students, indicating strong performance in identifying potential burnout cases. This suggests that ensemble methods are effective when the target variable is carefully defined with minimal label noise.
+# 7. ROC CURVE COMPARISON
+fig, ax = plt.subplots(figsize=(8, 6))
+for model, name in [(log_reg, "Logistic Regression"), (dt, "Decision Tree"), (rf, "Random Forest")]:
+    RocCurveDisplay.from_estimator(model, X_test, y_test, name=name, ax=ax)
+ax.set_title("ROC Curve Comparison")
+plt.tight_layout()
+plt.savefig("roc_curves.png", dpi=150)
+plt.show()
 
-results = {
-    "Model" : ["Logistic Regression", "Decision Tree", "Random Forest"],
-    "Accuracy" : [
-        accuracy_score(Y_test, Y_pred_lr),
-        accuracy_score(Y_test, Y_pred_dt),
-        accuracy_score(Y_test, Y_pred_rf)
+# 8. FINAL COMPARISON TABLE
+
+results = pd.DataFrame({
+    "Model": ["Logistic Regression", "Decision Tree", "Random Forest"],
+    "Test Accuracy": [
+        round(accuracy_score(y_test, y_pred_lr), 4),
+        round(accuracy_score(y_test, y_pred_dt), 4),
+        round(accuracy_score(y_test, y_pred_rf), 4)
+    ],
+    "Test Recall (at-risk)": [
+        round(recall_score(y_test, y_pred_lr), 4),
+        round(recall_score(y_test, y_pred_dt), 4),
+        round(recall_score(y_test, y_pred_rf), 4)
+    ],
+    "ROC-AUC": [
+        round(roc_auc_score(y_test, log_reg.predict_proba(X_test)[:, 1]), 4),
+        round(roc_auc_score(y_test, dt.predict_proba(X_test)[:, 1]), 4),
+        round(roc_auc_score(y_test, rf.predict_proba(X_test)[:, 1]), 4)
+    ],
+    "CV Recall Mean": [
+        round(cv_lr.mean(), 4),
+        round(cv_dt.mean(), 4),
+        round(cv_rf.mean(), 4)
+    ],
+    "CV Recall Std": [
+        round(cv_lr.std(), 4),
+        round(cv_dt.std(), 4),
+        round(cv_rf.std(), 4)
     ]
-}
+})
 
-results_df = pd.DataFrame(results)
-print(results_df)
+print("\n========== Final Model Comparison ==========")
+print(results.to_string(index=False))
 
-from sklearn.metrics import recall_score
-print("\nRecall for 'at risk' students (class = 1) : ")
-print("Logistic Regression : ", recall_score(Y_test, Y_pred_lr))
-print("Decision Tree : ", recall_score(Y_test, Y_pred_dt))
-print("Random Forest : ", recall_score(Y_test, Y_pred_rf))
-# Observation:
-# Random Forest achieves the highest recall for at-risk students, while Logistic Regression remains competitive with slightly lower recall but higher interpretability. Model choice depends on whether sensitivity or simplicity is prioritized.
-
-# Final Model Selection:
-# Random Forest was selected as the final model as it achieved the highest overall accuracy and recall for at-risk students. Logistic Regression also performed strongly and remains a highly interpretable baseline. The results demonstrate that ensemble methods can better capture complex behavioral patterns associated with academic burnout when the target variable is carefully defined and label noise is minimized.
-
-# CONCLUSION
-# This project focused on early identification of academic burnout and performance decline using behavioral and academic indicators. Exploratory data analysis revealed that high absenteeism, low study engagement, and past academic failures are strongly associated with burnout risk.
-
-# Multiple machine learning models were evaluated, including Logistic Regression, Decision Tree, and Random Forest. Random Forest emerged as the best-performing model, achieving the highest accuracy and recall for at-risk students, while Logistic Regression provided a strong and interpretable baseline.
-
-# The study highlights the importance of careful target definition and feature engineering in supervised learning tasks and demonstrates how data-driven approaches can support proactive academic intervention strategies.
-
-# The risk definition was carefully designed to balance sensitivity and realism, ensuring that only consistent performance decline or academic failure was classified as burnout risk.
-
-# The proposed approach demonstrates how data-driven insights can support timely academic interventions, enabling educators and institutions to proactively identify and support students at risk of burnout.Improved performance after refining the risk definition highlights the importance of careful target engineering in supervised learning tasks.
+# 1. Label validity: "at_risk" is derived from grades, not validated burnout measures.
+#    The model predicts grade-based academic risk, not burnout in the clinical sense.
+# 2. Dataset size: 395 rows is very small. Cross-validation variance will be high.
+#    Results are indicative, not reliable for real deployment.
+# 3. Leakage risk: G1 and G2 were dropped to prevent label leakage. If kept,
+#    model performance would inflate artificially.
+# 4. Generalizability: Data is from Portuguese secondary schools. 
+#    Do not generalize to other populations without re-validation.
+# 5. Threshold: Default 0.5 prediction threshold is used.
