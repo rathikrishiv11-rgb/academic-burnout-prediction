@@ -31,7 +31,7 @@ df["at_risk"] = (
     ((df["G3"] < df["G2"]) & (df["G2"] < df["G1"]))
 ).astype(int)
 
-print("\n--- Class Distribution ---")
+print("\nClass Distribution ")
 print(df["at_risk"].value_counts())
 print(df["at_risk"].value_counts(normalize=True).round(3))
 
@@ -104,7 +104,7 @@ log_reg.fit(X_train, y_train)
 y_pred_lr = log_reg.predict(X_test)
 cv_lr = cross_val_score(log_reg, X, y, cv=cv, scoring="recall")
 
-print("\n========== Logistic Regression ==========")
+print("\n Logistic Regression")
 print(f"Test Accuracy : {accuracy_score(y_test, y_pred_lr):.4f}")
 print(f"Test ROC-AUC  : {roc_auc_score(y_test, log_reg.predict_proba(X_test)[:, 1]):.4f}")
 print(f"CV Recall (5-fold): {cv_lr.mean():.4f} ± {cv_lr.std():.4f}")
@@ -125,7 +125,7 @@ dt.fit(X_train, y_train)
 y_pred_dt = dt.predict(X_test)
 cv_dt = cross_val_score(dt, X, y, cv=cv, scoring="recall")
 
-print("\n========== Decision Tree ==========")
+print("\nDecision Tree ")
 print(f"Test Accuracy : {accuracy_score(y_test, y_pred_dt):.4f}")
 print(f"Test ROC-AUC  : {roc_auc_score(y_test, dt.predict_proba(X_test)[:, 1]):.4f}")
 print(f"CV Recall (5-fold): {cv_dt.mean():.4f} ± {cv_dt.std():.4f}")
@@ -204,7 +204,7 @@ results = pd.DataFrame({
     ]
 })
 
-print("\n========== Final Model Comparison ==========")
+print("\nFinal Model Comparison")
 print(results.to_string(index=False))
 
 # 1. Label validity: "at_risk" is derived from grades, not validated burnout measures.
