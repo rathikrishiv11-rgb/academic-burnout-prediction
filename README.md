@@ -48,16 +48,6 @@ Evaluation used 5-fold Stratified Cross-Validation in addition to a held-out tes
 
 ---
 
-## Results
-
-| Model | Test Accuracy | Test Recall (at-risk) | ROC-AUC | CV Recall (mean ± std) |
-|---|---|---|---|---|
-| Logistic Regression | — | — | — | — |
-| Decision Tree | — | — | — | — |
-| Random Forest | — | — | — | — |
-
-> **Replace the — values with your actual printed output after running the script.**
-
 **Primary metric: Recall for at-risk students.**  
 In this problem, missing a student who is actually at risk (false negative) is more costly than a false alarm. Recall is therefore prioritized over accuracy.
 
