@@ -62,6 +62,36 @@ In this problem, missing a student who is actually at risk (false negative) is m
 
 ---
 
+## Results
+
+| Model               | Test Accuracy | Test Recall (At-Risk) | ROC-AUC | CV Recall Mean | CV Recall Std |
+|---------------------|--------------|----------------------|---------|----------------|---------------|
+| Logistic Regression | 65.8%        | 51.9%                | 0.714   | 54.6%          | ±11.3%        |
+| Decision Tree       | 73.4%        | 59.3%                | 0.664   | 45.7%          | ±14.2%        |
+| Random Forest       | 70.9%        | 29.6%                | 0.703   | 25.5%          | ±6.9%         |
+
+**Selected model: Logistic Regression**
+
+Logistic Regression was selected as the most reliable model based on:
+- Highest ROC-AUC (0.714) — best overall discrimination ability
+- Highest cross-validated recall (54.6%) — most consistent on unseen data
+- Lowest CV variance (±11.3%) — most stable across folds
+
+Decision Tree achieved higher single test-split recall (59.3%) but showed
+high cross-validation variance (±14.2%), suggesting overfitting to the 
+specific test split rather than genuine generalisation.
+
+Random Forest underperformed on recall (29.6%) despite class_weight="balanced",
+likely due to poor probability calibration on the small dataset 
+(395 rows, 27 at-risk students in test set).
+
+**Key lesson:** Accuracy is a misleading metric for imbalanced classification.
+Random Forest achieved 70.9% accuracy while missing 70% of at-risk students —
+failing the core purpose of the system. Cross-validated recall on the minority
+class is the only metric that matters here.
+
+---
+
 ## Technologies
 - Python, Pandas, NumPy
 - Matplotlib, Seaborn
@@ -69,8 +99,9 @@ In this problem, missing a student who is actually at risk (false negative) is m
 
 ---
 
-## What I Would Improve With More Time
-- Experiment with XGBoost and compare against Random Forest
-- Tune the prediction threshold based on false negative cost
-- Collect a larger, more diverse dataset
-- Replace grade-proxy label with a validated academic stress survey
+## Future Work
+- SMOTE-based oversampling to address class imbalance more aggressively
+- XGBoost with hyperparameter tuning as an additional ensemble baseline
+- Prediction threshold optimisation based on false negative cost analysis
+- Validation on a larger, multi-institution dataset
+- Replacement of grade-proxy label with a validated academic stress instrument
